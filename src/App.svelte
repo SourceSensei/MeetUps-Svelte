@@ -1,95 +1,109 @@
 <script>
+  import meetups from "./Meetups/meetups-store.js";
   import Header from "./UI/Header.svelte";
   import MeetupGrid from "./Meetups/MeetupGrid.svelte";
   import TextInput from "./UI/TextInput.svelte";
   import Button from "./UI/Button.svelte";
   import EditMeetup from "./Meetups/EditMeetup.svelte";
+  import MeetupDetail from "./Meetups/MeetupDetail.svelte";
+  import LoadingSpinner from "./UI/LoadingSpinner.svelte";
+  import Error from "./UI/Error.svelte";
 
-  let meetups = [
-    {
-      id: "m1",
-      title: "Coding Bootcamp",
-      subtitle: "Learn to code in 2 hours",
-      description:
-        "In this meetup, we will have some experts that can teach you how to code",
-      imageUrl:
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Caffe_Nero_coffee_bar.jpg/1024px-Caffe_Nero_coffee_bar.jpg",
-      address: "27th Nerd Road, 32523 New York",
-      contactEmail: "l7Y1R@example.com",
-      isFavorite: false,
-    },
-    {
-      id: "m2",
-      title: "Swim Together",
-      subtitle: "Let's go for some swimming",
-      description: "We will simply swim some rounds!",
-      imageUrl:
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Aquarium_in_Boston%2C_Massachusetts%2C_1870.jpg/800px-Aquarium_in_Boston%2C_Massachusetts%2C_1870.jpg",
-      address: "27th Nerd Road, 32523 New York",
-      contactEmail: "l7Y1R@example.com",
-      isFavorite: false,
-    },
-  ];
+  // let meetups = ;
 
   let editMode;
+  let editedId;
+  let page = "overview";
+  let pageData = {};
+  let isLoading = true;
+  let error;
 
-  function addMeetup(event) {
-    const newMeetup = {
-      id: Math.random().toString(),
-      title: event.detail.title,
-      subtitle: event.detail.subtitle,
-      description: event.detail.description,
-      imageUrl: event.detail.imageUrl,
-      address: event.detail.address,
-      contactEmail: event.detail.email,
-    };
+  fetch("https://svelte-course.firebaseio.com/meetups.json")
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error("Fetching meetups failed, please try again later!");
+      }
+      return res.json();
+    })
+    .then((data) => {
+      const loadedMeetups = [];
+      for (const key in data) {
+        loadedMeetups.push({
+          ...data[key],
+          id: key,
+        });
+      }
+      setTimeout(() => {
+        isLoading = false;
+        meetups.setMeetups(loadedMeetups.reverse());
+      }, 1000);
+    })
+    .catch((err) => {
+      error = err;
+      isLoading = false;
+      console.log(err);
+    });
 
-    meetups = [newMeetup, ...meetups];
+  function savedMeetup(event) {
     editMode = null;
+    editedId = null;
   }
-
-  function togglefavorite(event) {
-    const id = event.detail;
-    const updatedMeetup = { ...meetups.find((m) => m.id === id) };
-    updatedMeetup.isFavorite = !updatedMeetup.isFavorite;
-    const meetupIndex = meetups.findIndex((m) => m.id === id);
-    const updatedMeetups = [...meetups];
-    updatedMeetups[meetupIndex] = updatedMeetup;
-    meetups = updatedMeetups;
-  }
-
 
   function cancelEdit() {
     editMode = null;
+    editedId = null;
   }
 
+  function showDetails(event) {
+    page = "details";
+    pageData.id = event.detail;
+  }
 
+  function closeDetails() {
+    page = "overview";
+    pageData = {};
+  }
+
+  function startEdit(event) {
+    editMode = "edit";
+    editedId = event.detail;
+  }
+
+  function clearError() {
+    error = null;
+  }
 </script>
+
+{#if error}
+  <Error message={error.message} on:cancel={clearError} />
+{/if}
 
 <Header />
 
 <main>
-  <div class="meetup-controls">
-    <Button on:click={() => (editMode = "add")} >New Meetup</Button>
-  </div>
-
-  <!-- {#if editMode === "add"}
-    <EditMeetup />
+  {#if page === "overview"}
+    {#if editMode === "edit"}
+      <EditMeetup id={editedId} on:save={savedMeetup} on:cancel={cancelEdit} />
+    {/if}
+    {#if isLoading}
+      <LoadingSpinner />
+    {:else}
+      <MeetupGrid
+        meetups={$meetups}
+        on:showdetails={showDetails}
+        on:edit={startEdit}
+        on:add={() => {
+          editMode = "edit";
+        }}
+      />
+    {/if}
   {:else}
-    <MeetupGrid {meetups} on:togglefavorite={togglefavorite} />
-  {/if} -->
-  {#if editMode === "add"}
-    <EditMeetup on:save={addMeetup} on:cancel={cancelEdit} />
+    <MeetupDetail id={pageData.id} on:close={closeDetails} />
   {/if}
-  <MeetupGrid {meetups} on:togglefavorite={togglefavorite} />
 </main>
 
 <style>
   main {
     margin-top: 5rem;
-  }
-
-  .meetup-controls {
-    margin: 1rem;
   }
 </style>
